@@ -11,7 +11,7 @@ use crate::{
         ParseResult::{self, *},
         ResultExt, StreamError, Tracked,
     },
-    lib::{convert::TryFrom, marker::PhantomData},
+    lib::{convert::TryFrom, error::Error as StdError, marker::PhantomData},
     parser::ParseMode,
 };
 
@@ -650,7 +650,7 @@ where [
     Input: RangeStream,
     P: Parser<Input>,
     usize: TryFrom<P::Output>,
-    <usize as TryFrom<P::Output>>::Error: std::error::Error + Send + Sync + 'static,
+    <usize as TryFrom<P::Output>>::Error: StdError + Send + Sync + 'static,
 ]
 {
     len
