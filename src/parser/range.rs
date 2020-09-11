@@ -11,13 +11,13 @@ use crate::{
         ParseResult::{self, *},
         ResultExt, StreamError, Tracked,
     },
-    lib::marker::PhantomData,
+    lib::{convert::TryFrom, marker::PhantomData},
     parser::ParseMode,
 };
 
 use crate::stream::{
     uncons_range, uncons_while, uncons_while1, wrap_stream_error, Range as StreamRange,
-    RangeStream, StreamOnce,
+    RangeStream, StreamErrorFor, StreamOnce,
 };
 
 use crate::Parser;
@@ -626,6 +626,40 @@ where
         searcher,
         _marker: PhantomData,
     }
+}
+
+parser! {
+/// Takes a parser which parses a `length` then extracts a range of that length and returns it.
+/// Commonly used in binary formats
+///
+/// ```
+/// # use combine::parser::{byte::num::be_u16, range::length_prefixed};
+/// # use combine::*;
+/// # fn main() {
+/// let mut input = Vec::new();
+/// input.extend_from_slice(&3u16.to_be_bytes());
+/// input.extend_from_slice(b"1234");
+///
+/// let mut parser = length_prefixed(be_u16());
+/// let result = parser.parse(&input[..]);
+/// assert_eq!(result, Ok((&b"123"[..], &b"4"[..])));
+/// # }
+/// ```
+pub fn length_prefixed[Input, P](len: P)(Input) -> Input::Range
+where [
+    Input: RangeStream,
+    P: Parser<Input>,
+    usize: TryFrom<P::Output>,
+    <usize as TryFrom<P::Output>>::Error: std::error::Error + Send + Sync + 'static,
+]
+{
+    len
+        .and_then(|u| {
+            usize::try_from(u)
+                .map_err(StreamErrorFor::<Input>::other)
+        })
+        .then_partial(|&mut len| take(len))
+}
 }
 
 #[cfg(test)]
